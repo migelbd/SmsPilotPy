@@ -1,0 +1,2 @@
+class SmsPilotFatalError(Exception):
+    pass
