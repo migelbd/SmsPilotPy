@@ -1,3 +1,5 @@
+from datetime import datetime
+
 ERROR = -2
 NOT_DELIVERED = -1
 RECEIVED = 0
@@ -24,16 +26,21 @@ def get_status_dict(short=True) -> dict:
 
 class Message:
     def __init__(self, **data):
-        self.id = data.get('id')
-        self.server_id = data.get('server_id')
+        self.id = int(data.get('id'))
+        self.server_id = int(data.get('server_id'))
         self.from_ = data.get('from')
-        self.to = data.get('to')
+        self.to = int(data.get('to'))
         self.text = data.get('text')
-        self.parts = data.get('parts')
-        self.price = data.get('price')
+        self.parts = int(data.get('parts'))
+        self.price = float(data.get('price'))
         self.status = int(data.get('status'))
         self.error = data.get('error')
-        self.send_datetime = data.get('send_datetime')
+
+        try:
+            self.send_datetime = datetime.strptime(data.get('send_datetime'), '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            self.send_datetime = None
+
         self.country = data.get('country')
         self.operator = data.get('operator')
 
@@ -57,9 +64,9 @@ class MessageResponse:
 
     def __init__(self, server_response: dict):
         self.send = [Message(**msg) for msg in server_response.get('send', [])]
-        self.cost = server_response.get('cost')
-        self.balance = server_response.get('balance')
-        self.server_packet_id = server_response.get('server_packet_id')
+        self.cost = float(server_response.get('cost', 0))
+        self.balance = float(server_response.get('balance', 0))
+        self.server_packet_id = int(server_response.get('server_packet_id', 0))
 
     def __len__(self):
         return len(self.send)
@@ -74,9 +81,9 @@ class MessageResponse:
 class MessageCheck:
 
     def __init__(self, check: dict):
-        self.id = check.get('id')
-        self.server_id = check.get('id')
-        self.status = check.get('status')
+        self.id = int(check.get('id', 0))
+        self.server_id = int(check.get('id', 0))
+        self.status = int(check.get('status', ERROR))
         self.modified = check.get('modified')
 
     def is_delivered(self) -> bool:
@@ -92,7 +99,7 @@ class MessageCheckResponse:
 class UserInfo:
     def __init__(self, server_response):
         info = server_response.get('info', {})
-        self.id = info.get('id')
+        self.id = int(info.get('id'))
         self.tariff_id = info.get('tariff_id')
         self.email = info.get('email')
         self.phone = info.get('phone')

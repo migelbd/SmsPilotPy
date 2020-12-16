@@ -15,6 +15,16 @@ class SmsPilot:
     }
 
     def __init__(self, api_key: str, default_sender: str = 'INFORM', callback: Callback = None, **options):
+        """
+        SmsPilot
+
+        :param api_key: Ключ API
+        :param default_sender: Отправитель по умолчанию
+        :param callback: Колл-бэк
+        :param options:
+        :keyword test: Тестовый режим (без передачи оператору)
+        :keyword cost: Получить только стоимость
+        """
         self._callback = callback
         self._api_key = api_key
         self._default_sender = default_sender
@@ -65,16 +75,46 @@ class SmsPilot:
         return len(self.messages) + 1
 
     def send_message(self, to: Union[int, str], text: str, sender: str = None, **kwargs):
+        """
+        Отправить отдно сообщение
+
+        :param to: Номер телефона
+        :param text: Текст сообщения
+        :param sender: Отправитель
+        :param kwargs:
+        :keyword callback Callback:
+        :keyword ttl:
+        :keyword send_datetime: Время отправки сообщения
+        :return:
+        """
         self.add_message(to, text, sender, **kwargs)
         return self.send_messages()
 
     def send_messages(self) -> objects.MessageResponse:
+        """
+        Отправить подготовленные сообщения
+
+        :return:
+        """
         data = {
             'send': self.messages
         }
+        self.messages = []
         return objects.MessageResponse(self._request(2, data))
 
     def add_message(self, to: Union[str, int], text: str, sender: str = None, **kwargs):
+        """
+        Добавить сообщение в список
+
+        :param to: Номер телефона
+        :param text: Текст сообщения
+        :param sender: Отправитель
+        :param kwargs:
+        :keyword callback Callback:
+        :keyword ttl:
+        :keyword send_datetime: Время отправки сообщения
+        :return:
+        """
         callback_obj = kwargs.get('callback', self._callback)
         time_to_live = kwargs.get('ttl')
         send_datetime = kwargs.get('send_datetime')
@@ -114,21 +154,46 @@ class SmsPilot:
         return objects.MessageCheckResponse(self._request(2, data))
 
     def get_balance(self, in_rur=True) -> Optional[float]:
+        """
+        Баланс
+
+        :param in_rur: В рублях
+        :return:
+        """
         data = {
             'balance': 'rur' if in_rur else 'sms'
         }
         return self._request(2, data).get('balance')
 
     def user_info(self) -> objects.UserInfo:
+        """
+        Информация о пользователе
+
+        :return:
+        """
         return objects.UserInfo(self._request(2, dict(info=True)))
 
     def send_hlr(self, to: Union[str, int], callback: Callback = None) -> objects.MessageResponse:
+        """
+        HLR запрос
+
+        :param to:
+        :param callback:
+        :return:
+        """
         data = dict(send='HLR', to=to)
         if callback and isinstance(callback, Callback):
             data.update(callback.to_dict())
         return objects.MessageResponse(self._request(1, data, 'GET'))
 
     def ping(self, to: Union[str, int], callback: Callback = None) -> objects.MessageResponse:
+        """
+        PING запрос
+
+        :param to:
+        :param callback:
+        :return:
+        """
         data = dict(send='PING', to=to)
         if callback and isinstance(callback, Callback):
             data.update(callback.to_dict())

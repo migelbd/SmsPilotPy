@@ -18,6 +18,10 @@ class SenderNotRegistered(SmsPilotAPIError):
     pass
 
 
+class SMSValidationError(Exception):
+    pass
+
+
 errors_types = {
     106: ApiKeyBlocked,
     110: ApiSystemError,
