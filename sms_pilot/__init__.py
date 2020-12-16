@@ -1,1 +1,1 @@
-from .sender import PilotSender
+from .sender import SmsPilot

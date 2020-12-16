@@ -5,51 +5,77 @@ from typing import Optional, Union, List
 import requests
 from .callback import Callback
 import sms_pilot.objects as objects
-from .exception import error_handle
+from .exception import error_handle, SmsPilotAPIError
 
 
-class PilotSender(object):
-    api_url_v2 = "http://smspilot.ru/api2.php"
-    api_url_v1 = "http://smspilot.ru/api.php"
+class SmsPilot:
+    api_urls = {
+        1: 'http://smspilot.ru/api.php',
+        2: 'http://smspilot.ru/api2.php'
+    }
 
-    def __init__(self, api_key: str, default_sender: str = 'INFORM', callback: Callback = None, is_test: int = None, is_cost: int = None):
+    def __init__(self, api_key: str, default_sender: str = 'INFORM', callback: Callback = None, **options):
         self._callback = callback
         self._api_key = api_key
         self._default_sender = default_sender
         self.messages = []
-        self._is_test = is_test
-        self._is_cost = is_cost
+        self._is_test = options.get('test', False)
+        self._is_cost = options.get('cost', False)
 
-    def _request_v2(self, data: dict) -> dict:
+    def prepare_request_data(self, data: dict):
         data.update(dict(
-            apikey=self._api_key
+            apikey=self._api_key,
+            format='json'
         ))
         if self._is_cost is not None:
-            data['cost'] = self._is_cost
+            data['cost'] = int(self._is_cost)
         if self._is_test is not None:
-            data['test'] = self._is_test
+            data['test'] = int(self._is_test)
+        return data
+
+    def _request(self, api_version: int, data: dict, method: str = 'POST') -> dict:
+        try:
+            api_url = self.api_urls[api_version]
+        except KeyError:
+            raise SmsPilotAPIError('Не верная версия API')
         headers = {
             'Content-type': 'application/json',
             'Accept': 'application/json',
             'User-Agent': 'SMSPilotPy/0.1'
         }
-        response = requests.post(self.api_url_v2, json=data, headers=headers)
-        response_data = response.json()
+        if method == 'POST':
+            response = requests.post(api_url, json=self.prepare_request_data(data), headers=headers)
+        elif method == 'GET':
+            response = requests.get(api_url, params=self.prepare_request_data(data), headers=headers)
+        else:
+            raise SmsPilotAPIError('Allowed GET or POST')
+        if response.status_code != 200:
+            raise SmsPilotAPIError('SomeError')
+
+        try:
+            response_data = response.json()
+        except json.JSONDecodeError:
+            raise SmsPilotAPIError(response.text)
         if 'error' in response_data:
             raise error_handle(response_data)
+
         return response_data
 
     def __get_last_message_id(self) -> int:
         return len(self.messages) + 1
 
+    def send_message(self, to: Union[int, str], text: str, sender: str = None, **kwargs):
+        self.add_message(to, text, sender, **kwargs)
+        return self.send_messages()
+
     def send_messages(self) -> objects.MessageResponse:
         data = {
             'send': self.messages
         }
-        return objects.MessageResponse(self._request_v2(data))
+        return objects.MessageResponse(self._request(2, data))
 
     def add_message(self, to: Union[str, int], text: str, sender: str = None, **kwargs):
-        callback_obj = kwargs.get('callback')
+        callback_obj = kwargs.get('callback', self._callback)
         time_to_live = kwargs.get('ttl')
         send_datetime = kwargs.get('send_datetime')
         msg = {
@@ -77,7 +103,7 @@ class PilotSender(object):
         data = {
             "check": {"server_id": v for v in server_ids}
         }
-        return self._request_v2(data)
+        return self._request(2, data)
 
     def check_by_server_pocket_id(self, server_pocket_id: int):
         data = {
@@ -85,22 +111,25 @@ class PilotSender(object):
             'server_pocket_id': server_pocket_id
         }
 
-        return objects.MessageCheckResponse(self._request_v2(data))
+        return objects.MessageCheckResponse(self._request(2, data))
 
     def get_balance(self, in_rur=True) -> Optional[float]:
         data = {
             'balance': 'rur' if in_rur else 'sms'
         }
-        return self._request_v2(data).get('balance')
+        return self._request(2, data).get('balance')
 
     def user_info(self) -> objects.UserInfo:
-        return objects.UserInfo(self._request_v2(dict(info=True)))
+        return objects.UserInfo(self._request(2, dict(info=True)))
 
+    def send_hlr(self, to: Union[str, int], callback: Callback = None) -> objects.MessageResponse:
+        data = dict(send='HLR', to=to)
+        if callback and isinstance(callback, Callback):
+            data.update(callback.to_dict())
+        return objects.MessageResponse(self._request(1, data, 'GET'))
 
-
-
-
-
-
-
-# {'send': [{'id': 1, 'server_id': '164975610', 'from': 'INFORM', 'to': '79209291770', 'text': 'hello', 'parts': '1', 'status': '0', 'error': '0', 'send_datetime': '', 'country': 'RU', 'operator': 'MEGAFON', 'price': '2.55'}], 'server_packet_id': '164975610', 'balance': '646.66', 'cost': '2.55'}
+    def ping(self, to: Union[str, int], callback: Callback = None) -> objects.MessageResponse:
+        data = dict(send='PING', to=to)
+        if callback and isinstance(callback, Callback):
+            data.update(callback.to_dict())
+        return objects.MessageResponse(self._request(1, data, 'GET'))

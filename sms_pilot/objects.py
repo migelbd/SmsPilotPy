@@ -1,3 +1,27 @@
+ERROR = -2
+NOT_DELIVERED = -1
+RECEIVED = 0
+OPERATOR = 1
+DELIVERED = 2
+POSTPONED = 3
+
+MESSAGE_STATUSES = (
+    (ERROR, 'Ошибка', 'Ошибка, неправильные параметры запроса'),
+    (NOT_DELIVERED, 'Не доставлено',
+     'Сообщение не доставлено (не в сети, заблокирован, не взял трубку), PING - не в сети, HLR - не обслуживается (заблокирован)'),
+    (RECEIVED, 'Новое', 'Новое сообщение/запрос, ожидает обработки у нас на сервере'),
+    (OPERATOR, 'В очереди', 'Сообщение или запрос ожидают отправки на сервере оператора'),
+    (DELIVERED, 'Доставлено', 'Доставлено, звонок совершен, PING - в сети, HLR - обслуживается'),
+    (POSTPONED, 'Отложено', 'Отложенная отправка, отправка сообщения/запроса запланирована на другое время'),
+)
+
+
+def get_status_dict(short=True) -> dict:
+    if short:
+        return dict([(code, short) for code, short, description in MESSAGE_STATUSES])
+    return dict([(code, description) for code, short, description in MESSAGE_STATUSES])
+
+
 class Message:
     def __init__(self, **data):
         self.id = data.get('id')
@@ -7,11 +31,26 @@ class Message:
         self.text = data.get('text')
         self.parts = data.get('parts')
         self.price = data.get('price')
-        self.status = data.get('status')
+        self.status = int(data.get('status'))
         self.error = data.get('error')
         self.send_datetime = data.get('send_datetime')
         self.country = data.get('country')
         self.operator = data.get('operator')
+
+    def is_delivered(self) -> bool:
+        return self.status == DELIVERED
+
+    def is_error(self) -> bool:
+        return self.status == ERROR
+
+    def get_status_verbose(self) -> str:
+        return get_status_dict().get(self.status)
+
+    def __str__(self):
+        return 'Message(%s): %s %s' % (self.id, self.to, self.get_status_verbose())
+
+    def __repr__(self):
+        return str(self)
 
 
 class MessageResponse:
@@ -22,14 +61,17 @@ class MessageResponse:
         self.balance = server_response.get('balance')
         self.server_packet_id = server_response.get('server_packet_id')
 
+    def __len__(self):
+        return len(self.send)
+
+    def __str__(self):
+        return 'MessageResponse: %s' % self.server_packet_id
+
+    def __repr__(self):
+        return str(self)
+
 
 class MessageCheck:
-    NOT_FOUND = -2
-    NOT_DELIVERED = -1
-    RECEIVED = 0
-    OPERATOR = 1
-    DELIVERED = 2
-    POSTPONED = 3
 
     def __init__(self, check: dict):
         self.id = check.get('id')
@@ -38,7 +80,7 @@ class MessageCheck:
         self.modified = check.get('modified')
 
     def is_delivered(self) -> bool:
-        return self.status == self.DELIVERED
+        return self.status == DELIVERED
 
 
 class MessageCheckResponse:
@@ -61,5 +103,8 @@ class UserInfo:
         self.default_sender = info.get('default_sender')
         self.any_sender = info.get('any_sender')
 
-    def __repr__(self):
+    def __str__(self):
         return f'UserInfo: {self.name}'
+
+    def __repr__(self):
+        return str(self)

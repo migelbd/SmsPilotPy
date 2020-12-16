@@ -6,7 +6,7 @@ class ApiKeyBlocked(SmsPilotAPIError):
     pass
 
 
-class SystemError(SmsPilotAPIError):
+class ApiSystemError(SmsPilotAPIError):
     pass
 
 
@@ -20,7 +20,7 @@ class SenderNotRegistered(SmsPilotAPIError):
 
 errors_types = {
     106: ApiKeyBlocked,
-    110: SystemError,
+    110: ApiSystemError,
     112: NoMoneyError,
     204: SenderNotRegistered
 }
