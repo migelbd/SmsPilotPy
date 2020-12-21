@@ -16,5 +16,11 @@ setup(
     install_requires=['requests'],
     url='https://github.com/migelbd/SmsPilotPy',
     author='Mikhail Badrazhan',
-    author_email='migel.bd@gmail.com'
+    author_email='migel.bd@gmail.com',
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires='>=3.6',
 )

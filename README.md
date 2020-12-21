@@ -1,3 +1,4 @@
+![Upload Python Package](https://github.com/migelbd/SmsPilotPy/workflows/Upload%20Python%20Package/badge.svg)
 # SmsPilotPy
 
 Не официальный клиент API проекта SMSPilot 
