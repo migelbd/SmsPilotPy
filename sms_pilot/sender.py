@@ -32,7 +32,7 @@ class SmsPilot:
         self._is_test = options.get('test', False)
         self._is_cost = options.get('cost', False)
 
-    def prepare_request_data(self, data: dict):
+    def prepare_request_data(self, data: dict) -> dict:
         data.update(dict(
             apikey=self._api_key,
             format='json'
@@ -76,7 +76,7 @@ class SmsPilot:
 
     def send_message(self, to: Union[int, str], text: str, sender: str = None, **kwargs):
         """
-        Отправить отдно сообщение
+        Отправить одно сообщение
 
         :param to: Номер телефона
         :param text: Текст сообщения
@@ -136,6 +136,14 @@ class SmsPilot:
             msg['ttl'] = time_to_live
         self.messages.append(msg)
         return self
+
+    def clear_messages(self):
+        """
+        Очистка подготовленных сообщений
+
+        :return:
+        """
+        self.messages = []
 
     def check_by_server_id(self, server_ids: Union[int, List[int]]):
         if isinstance(server_ids, int):

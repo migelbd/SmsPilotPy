@@ -1,5 +1,5 @@
 # SmsPilotPy
 
-Не официальные клиент API проекта SMSPilot 
+Не официальный клиент API проекта SMSPilot 
 
 https://smspilot.ru/
