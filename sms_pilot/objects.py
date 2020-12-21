@@ -123,7 +123,7 @@ class UserInfo:
         self.any_sender = info.get('any_sender')
 
     def __str__(self):
-        return f'UserInfo: {self.name}'
+        return 'UserInfo: %s' % self.name
 
     def __repr__(self):
         return str(self)

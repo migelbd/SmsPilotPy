@@ -37,4 +37,4 @@ def error_handle(data: dict):
 
     exc_class = errors_types.get(error_code, SmsPilotAPIError)
 
-    return exc_class(f"{error_code}: {error_description}")
+    return exc_class("%s: %s" % (error_code, error_description))
