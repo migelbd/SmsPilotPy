@@ -3,7 +3,7 @@ from sms_pilot import SmsPilot, objects, exception
 from sms_pilot.callback import Callback
 
 API_KEY = 'XXXXXXXXXXXXYYYYYYYYYYYYZZZZZZZZXXXXXXXXXXXXYYYYYYYYYYYYZZZZZZZZ'
-PHONE = 792011122233
+PHONE = 79201112223
 
 
 class SmsPilotTestCase(unittest.TestCase):
