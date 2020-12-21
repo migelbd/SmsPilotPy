@@ -63,7 +63,12 @@ class Message:
 class MessageResponse:
 
     def __init__(self, server_response: dict):
-        self.send = [Message(**msg) for msg in server_response.get('send', [])]
+        self.raw_send = [Message(**msg) for msg in server_response.get('send', [])]
+        try:
+            self.send = self.raw_send[0]
+        except IndexError:
+            self.send = []
+
         self.cost = float(server_response.get('cost', 0))
         self.balance = float(server_response.get('balance', 0))
         self.server_packet_id = int(server_response.get('server_packet_id', 0))
@@ -76,6 +81,13 @@ class MessageResponse:
 
     def __repr__(self):
         return str(self)
+
+
+class MessagesResponse(MessageResponse):
+
+    def __init__(self, server_response: dict):
+        super().__init__(server_response)
+        self.send = self.raw_send
 
 
 class MessageCheck:

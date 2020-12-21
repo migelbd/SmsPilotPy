@@ -74,7 +74,7 @@ class SmsPilot:
     def __get_last_message_id(self) -> int:
         return len(self.messages) + 1
 
-    def send_message(self, to: Union[int, str], text: str, sender: str = None, **kwargs):
+    def send_message(self, to: Union[int, str], text: str, sender: str = None, **kwargs) -> objects.MessageResponse:
         """
         Отправить одно сообщение
 
@@ -90,7 +90,7 @@ class SmsPilot:
         self.add_message(to, text, sender, **kwargs)
         return self.send_messages()
 
-    def send_messages(self) -> objects.MessageResponse:
+    def send_messages(self) -> Union[objects.MessagesResponse, objects.MessageResponse]:
         """
         Отправить подготовленные сообщения
 
@@ -100,7 +100,10 @@ class SmsPilot:
             'send': self.messages
         }
         self.messages = []
-        return objects.MessageResponse(self._request(2, data))
+        if len(data['send']) == 1:
+            return objects.MessageResponse(self._request(2, data))
+        else:
+            return objects.MessagesResponse(self._request(2, data))
 
     def add_message(self, to: Union[str, int], text: str, sender: str = None, **kwargs):
         """
@@ -181,7 +184,7 @@ class SmsPilot:
         """
         return objects.UserInfo(self._request(2, dict(info=True)))
 
-    def send_hlr(self, to: Union[str, int], callback: Callback = None) -> objects.MessageResponse:
+    def send_hlr(self, to: Union[str, int], callback: Callback = None) -> objects.MessagesResponse:
         """
         HLR запрос
 
@@ -192,9 +195,9 @@ class SmsPilot:
         data = dict(send='HLR', to=to)
         if callback and isinstance(callback, Callback):
             data.update(callback.to_dict())
-        return objects.MessageResponse(self._request(1, data, 'GET'))
+        return objects.MessagesResponse(self._request(1, data, 'GET'))
 
-    def ping(self, to: Union[str, int], callback: Callback = None) -> objects.MessageResponse:
+    def ping(self, to: Union[str, int], callback: Callback = None) -> objects.MessagesResponse:
         """
         PING запрос
 
@@ -205,4 +208,4 @@ class SmsPilot:
         data = dict(send='PING', to=to)
         if callback and isinstance(callback, Callback):
             data.update(callback.to_dict())
-        return objects.MessageResponse(self._request(1, data, 'GET'))
+        return objects.MessagesResponse(self._request(1, data, 'GET'))
