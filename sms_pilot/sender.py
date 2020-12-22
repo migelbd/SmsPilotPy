@@ -28,19 +28,24 @@ class SmsPilot:
         self._callback = callback
         self._api_key = api_key
         self._default_sender = default_sender
+        self.debug = options.get('debug')
         self.messages = []
-        self._is_test = options.get('test', False)
-        self._is_cost = options.get('cost', False)
+        self.is_test = options.get('test', False)
+        self.is_cost = options.get('cost', False)
+        self.raw_response = options.get('raw_response', False)
 
     def prepare_request_data(self, data: dict) -> dict:
         data.update(dict(
             apikey=self._api_key,
             format='json'
         ))
-        if self._is_cost is not None:
-            data['cost'] = int(self._is_cost)
-        if self._is_test is not None:
-            data['test'] = int(self._is_test)
+        if self.is_cost is not None:
+            data['cost'] = int(self.is_cost)
+        if self.is_test is not None:
+            data['test'] = int(self.is_test)
+        if self.debug:
+            data['debug'] = self.debug
+
         return data
 
     def _request(self, api_version: int, data: dict, method: str = 'POST') -> dict:
@@ -74,7 +79,7 @@ class SmsPilot:
     def __get_last_message_id(self) -> int:
         return len(self.messages) + 1
 
-    def send_message(self, to: Union[int, str], text: str, sender: str = None, **kwargs) -> objects.MessageResponse:
+    def send_message(self, to: Union[int, str], text: str, sender: str = None, **kwargs) -> Union[objects.MessageResponse, dict]:
         """
         Отправить одно сообщение
 
@@ -87,10 +92,30 @@ class SmsPilot:
         :keyword send_datetime: Время отправки сообщения
         :return:
         """
-        self.add_message(to, text, sender, **kwargs)
-        return self.send_messages()
+        callback_obj = kwargs.get('callback', self._callback)
+        time_to_live = kwargs.get('ttl')
+        send_datetime = kwargs.get('send_datetime')
 
-    def send_messages(self) -> Union[objects.MessagesResponse, objects.MessageResponse]:
+        msg = {
+            'to': to,
+            'send': text,
+            'from': sender or self._default_sender
+        }
+        if isinstance(callback_obj, Callback):
+            msg.update(callback_obj.to_dict())
+
+        if isinstance(send_datetime, datetime):
+            msg['send_datetime'] = send_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+        if time_to_live:
+            assert isinstance(time_to_live, int) and 1 <= time_to_live <= 1440, 'TTL может быть в диапозоне 1...1440'
+            msg['ttl'] = time_to_live
+        response = self._request(1, self.prepare_request_data(msg))
+        if self.raw_response:
+            return response
+        return objects.MessageResponse(response)
+
+    def send_messages(self) -> Union[objects.MessagesResponse, dict]:
         """
         Отправить подготовленные сообщения
 
@@ -100,10 +125,10 @@ class SmsPilot:
             'send': self.messages
         }
         self.messages = []
-        if len(data['send']) == 1:
-            return objects.MessageResponse(self._request(2, data))
-        else:
-            return objects.MessagesResponse(self._request(2, data))
+        response = self._request(2, data)
+        if self.raw_response:
+            return response
+        return objects.MessagesResponse(response)
 
     def add_message(self, to: Union[str, int], text: str, sender: str = None, **kwargs):
         """
