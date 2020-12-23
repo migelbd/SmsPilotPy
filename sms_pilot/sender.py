@@ -1,11 +1,15 @@
 import json
 from datetime import datetime
 from typing import Optional, Union, List
-
+import re
 import requests
 from .callback import Callback
 import sms_pilot.objects as objects
 from .exception import error_handle, SmsPilotAPIError
+
+
+def validate_email(value: str):
+    return re.search(r'^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$', value)
 
 
 class SmsPilot:
@@ -24,6 +28,7 @@ class SmsPilot:
         :param options:
         :keyword test: Тестовый режим (без передачи оператору)
         :keyword cost: Получить только стоимость
+        :keyword raw_response Если True возвращает dict на запросы
         """
         self._callback = callback
         self._api_key = api_key
@@ -33,11 +38,14 @@ class SmsPilot:
         self.is_test = options.get('test', False)
         self.is_cost = options.get('cost', False)
         self.raw_response = options.get('raw_response', False)
+        self._format = options.get('format', 'json')
+        if self._format != 'json':
+            self.raw_response = True
 
     def prepare_request_data(self, data: dict) -> dict:
         data.update(dict(
             apikey=self._api_key,
-            format='json'
+            format=self._format if self._format in ('json', 'text', 'xml', 'v') else 'json'
         ))
         if self.is_cost is not None:
             data['cost'] = int(self.is_cost)
@@ -49,6 +57,7 @@ class SmsPilot:
         return data
 
     def _request(self, api_version: int, data: dict, method: str = 'POST') -> dict:
+        from sms_pilot import __version__
         try:
             api_url = self.api_urls[api_version]
         except KeyError:
@@ -56,7 +65,7 @@ class SmsPilot:
         headers = {
             'Content-type': 'application/json',
             'Accept': 'application/json',
-            'User-Agent': 'SMSPilotPy/0.1'
+            'User-Agent': 'SMSPilotPy/%s' % __version__
         }
         if method == 'POST':
             response = requests.post(api_url, json=self.prepare_request_data(data), headers=headers)
@@ -76,10 +85,26 @@ class SmsPilot:
 
         return response_data
 
+    def __extra_params(self, **data) -> dict:
+        callback_obj = data.get('callback', self._callback)
+        time_to_live = data.get('ttl')
+        send_datetime = data.get('send_datetime')
+        if isinstance(callback_obj, Callback):
+            data.update(callback_obj.to_dict())
+
+        if isinstance(send_datetime, datetime):
+            data['send_datetime'] = send_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+        if time_to_live:
+            assert isinstance(time_to_live, int) and 1 <= time_to_live <= 1440, 'TTL может быть в диапозоне 1...1440'
+            data['ttl'] = time_to_live
+        return data
+
     def __get_last_message_id(self) -> int:
         return len(self.messages) + 1
 
-    def send_message(self, to: Union[int, str], text: str, sender: str = None, **kwargs) -> Union[objects.MessageResponse, dict]:
+    def send_message(self, to: Union[int, str], text: str, sender: str = None, **kwargs) -> Union[
+        objects.MessageResponse, dict, str]:
         """
         Отправить одно сообщение
 
@@ -92,30 +117,20 @@ class SmsPilot:
         :keyword send_datetime: Время отправки сообщения
         :return:
         """
-        callback_obj = kwargs.get('callback', self._callback)
-        time_to_live = kwargs.get('ttl')
-        send_datetime = kwargs.get('send_datetime')
-
         msg = {
             'to': to,
             'send': text,
-            'from': sender or self._default_sender
+            'from': sender or self._default_sender,
+            'fields': 'all'
         }
-        if isinstance(callback_obj, Callback):
-            msg.update(callback_obj.to_dict())
+        msg.update(self.__extra_params(**kwargs))
 
-        if isinstance(send_datetime, datetime):
-            msg['send_datetime'] = send_datetime.strftime('%Y-%m-%d %H:%M:%S')
-
-        if time_to_live:
-            assert isinstance(time_to_live, int) and 1 <= time_to_live <= 1440, 'TTL может быть в диапозоне 1...1440'
-            msg['ttl'] = time_to_live
-        response = self._request(1, self.prepare_request_data(msg))
+        response = self._request(1, self.prepare_request_data(msg), 'GET')
         if self.raw_response:
             return response
         return objects.MessageResponse(response)
 
-    def send_messages(self) -> Union[objects.MessagesResponse, dict]:
+    def send_messages(self) -> Union[objects.MessagesResponse, dict, str]:
         """
         Отправить подготовленные сообщения
 
@@ -124,7 +139,7 @@ class SmsPilot:
         data = {
             'send': self.messages
         }
-        self.messages = []
+        self.clear_messages()
         response = self._request(2, data)
         if self.raw_response:
             return response
@@ -143,25 +158,13 @@ class SmsPilot:
         :keyword send_datetime: Время отправки сообщения
         :return:
         """
-        callback_obj = kwargs.get('callback', self._callback)
-        time_to_live = kwargs.get('ttl')
-        send_datetime = kwargs.get('send_datetime')
         msg = {
             'id': kwargs.get('id', self.__get_last_message_id()),
             'to': to,
             'from': sender or self._default_sender,
             'text': text
         }
-
-        if isinstance(callback_obj, Callback):
-            msg.update(callback_obj.to_dict())
-
-        if isinstance(send_datetime, datetime):
-            msg['send_datetime'] = send_datetime.strftime('%Y-%m-%d %H:%M:%S')
-
-        if time_to_live:
-            assert isinstance(time_to_live, int) and 1 <= time_to_live <= 1440, 'TTL может быть в диапозоне 1...1440'
-            msg['ttl'] = time_to_live
+        msg.update(self.__extra_params(**kwargs))
         self.messages.append(msg)
         return self
 
@@ -201,15 +204,18 @@ class SmsPilot:
         }
         return self._request(2, data).get('balance')
 
-    def user_info(self) -> objects.UserInfo:
+    def user_info(self) -> Union[objects.UserInfo, dict, str]:
         """
         Информация о пользователе
 
         :return:
         """
-        return objects.UserInfo(self._request(2, dict(info=True)))
+        response = self._request(2, dict(info=True))
+        if self.raw_response:
+            return response
+        return objects.UserInfo(response)
 
-    def send_hlr(self, to: Union[str, int], callback: Callback = None) -> objects.MessagesResponse:
+    def send_hlr(self, to: Union[str, int], callback: Callback = None) -> Union[objects.HlrResponse, dict, str]:
         """
         HLR запрос
 
@@ -220,9 +226,30 @@ class SmsPilot:
         data = dict(send='HLR', to=to)
         if callback and isinstance(callback, Callback):
             data.update(callback.to_dict())
-        return objects.MessagesResponse(self._request(1, data, 'GET'))
+        response = self._request(1, data, 'GET')
+        if self.raw_response:
+            return response
+        return objects.HlrResponse(response)
 
-    def ping(self, to: Union[str, int], callback: Callback = None) -> objects.MessagesResponse:
+    def check_ping_hlr(self, server_id: Union[int, List[Union[int, str]]]) -> Union[objects.CheckResponse, dict, str]:
+        """
+        Проверка статусов запросов HLR или Ping
+
+        :param server_id:
+        :return:
+        """
+        if isinstance(server_id, list):
+            server_id = ','.join(server_id)
+        data = {
+            'check': server_id
+        }
+
+        response = self._request(1, self.prepare_request_data(data), 'GET')
+        if self.raw_response:
+            return response
+        return objects.CheckResponse(response)
+
+    def ping(self, to: Union[str, int], callback: Callback = None) -> Union[objects.PingResponse, dict, str]:
         """
         PING запрос
 
@@ -233,4 +260,7 @@ class SmsPilot:
         data = dict(send='PING', to=to)
         if callback and isinstance(callback, Callback):
             data.update(callback.to_dict())
-        return objects.MessagesResponse(self._request(1, data, 'GET'))
+        response = self._request(1, data, 'GET')
+        if self.raw_response:
+            return response
+        return objects.PingResponse(response)

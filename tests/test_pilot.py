@@ -23,13 +23,12 @@ class SmsPilotTestCase(unittest.TestCase):
             text='Привет от Букина'
         )
 
-        self.assertEqual(result.server_packet_id, 123456)
+        self.assertIsInstance(result, objects.MessageResponse)
+        self.assertEqual(result.server_id, 10000)
 
-        message = result.send
-        self.assertEqual(message.status, objects.RECEIVED)
-        self.assertEqual(message.get_status_verbose(), 'Новое')
-        self.assertEqual(message.id, 1)
-        self.assertEqual(message.to, PHONE)
+        self.assertEqual(result.status, objects.RECEIVED)
+        self.assertEqual(result.get_status_verbose(), 'Новое')
+        self.assertEqual(result.phone, PHONE)
 
     def test_send_messages(self):
         prepare_message = [
@@ -62,3 +61,20 @@ class SmsPilotTestCase(unittest.TestCase):
     def test_callback_bad(self):
         callback = Callback('https://smspilot.ru/callback', method='DELETE')
         self.assertRaises(exception.SMSValidationError, callback.to_dict)
+
+    def test_send_hlr(self):
+        result = self.client.send_hlr(PHONE)
+        self.assertIsInstance(result, objects.HlrResponse)
+        self.assertEqual(result.status, objects.HlrResponse.ACCEPTED)
+
+    def test_send_ping(self):
+        result = self.client.ping(PHONE)
+        self.assertIsInstance(result, objects.PingResponse)
+        self.assertEqual(result.status, objects.PingResponse.ACCEPTED)
+
+    def test_check_hlr(self):
+        result = self.client.check_ping_hlr(10000)
+
+        self.assertIsInstance(result, objects.CheckResponse)
+        self.assertEqual(result.status, objects.CheckResponse.ERROR)
+
