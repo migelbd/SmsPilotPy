@@ -19,15 +19,22 @@ API_KEY = 'XXXXXXXXXXXXYYYYYYYYYYYYZZZZZZZZXXXXXXXXXXXXYYYYYYYYYYYYZZZZZZZZ'
 api = SmsPilot(API_KEY, default_sender='INFORM')
 
 result = api.send_message(79201112223, 'Привет, мир!')
-print(result.send.status) 
+print(result.status, result.get_status_verbose()) 
 print(result.cost)
 
+# Запрос PING
+ping_response = api.ping(79201112223)
+# time.sleep(10)
+ping_result = api.check_ping_hlr(ping_response.server_id)
+
+if ping_result.is_ot_of_service():
+    print('Не обслуживается')
 ```
 
 ### Отправка нескольких сообщений
 ```python
 from sms_pilot import SmsPilot
-from sms_pilot.callback import Callback
+from sms_pilot import Callback
 
 API_KEY = 'XXXXXXXXXXXXYYYYYYYYYYYYZZZZZZZZXXXXXXXXXXXXYYYYYYYYYYYYZZZZZZZZ'
 

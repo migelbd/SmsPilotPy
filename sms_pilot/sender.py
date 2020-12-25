@@ -5,11 +5,23 @@ import re
 import requests
 from .callback import Callback
 import sms_pilot.objects as objects
-from .exception import error_handle, SmsPilotAPIError
+from .exception import error_handle, SmsPilotAPIError, SMSValidationError
 
 
-def validate_email(value: str):
-    return re.search(r'^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$', value)
+def validate_email(value: str) -> Optional[str]:
+    if value is None:
+        return value
+    match = re.search(r'^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$', value)
+    if match:
+        return match.group(0)
+    return None
+
+
+def validate_phone(value: Union[str, int]) -> Optional[int]:
+    match = re.search(r'^7[0-9]{10}$', str(value))
+    if not match:
+        raise SMSValidationError('Phone invalid')
+    return int(match.group(0))
 
 
 class SmsPilot:
@@ -30,10 +42,11 @@ class SmsPilot:
         :keyword cost: Получить только стоимость
         :keyword raw_response Если True возвращает dict на запросы
         """
+        assert api_key, 'ApiKey not set'
         self._callback = callback
         self._api_key = api_key
         self._default_sender = default_sender
-        self.debug = options.get('debug')
+        self.debug = validate_email(options.get('debug'))
         self.messages = []
         self.is_test = options.get('test', False)
         self.is_cost = options.get('cost', False)
@@ -118,10 +131,9 @@ class SmsPilot:
         :return:
         """
         msg = {
-            'to': to,
+            'to': validate_phone(to),
             'send': text,
-            'from': sender or self._default_sender,
-            'fields': 'all'
+            'from': sender or self._default_sender
         }
         msg.update(self.__extra_params(**kwargs))
 
@@ -160,7 +172,7 @@ class SmsPilot:
         """
         msg = {
             'id': kwargs.get('id', self.__get_last_message_id()),
-            'to': to,
+            'to': validate_phone(to),
             'from': sender or self._default_sender,
             'text': text
         }

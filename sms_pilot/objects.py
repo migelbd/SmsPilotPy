@@ -48,8 +48,14 @@ class MessageResponse(MessageBase):
         self.status = int(msg_obj.get('status', 0))
         self.sender = msg_obj.get('sender')
         self.sender_orig = msg_obj.get('sender_orig')
-        self.created = datetime.strptime(msg_obj.get('created'), DATE_FORMAT)
-        self.modified = datetime.strptime(msg_obj.get('modified'), DATE_FORMAT)
+        try:
+            self.created = datetime.strptime(msg_obj.get('created'), DATE_FORMAT)
+        except (ValueError, TypeError):
+            self.created = None
+        try:
+            self.modified = datetime.strptime(msg_obj.get('modified'), DATE_FORMAT)
+        except (ValueError, TypeError):
+            self.modified = None
         self.parts = int(msg_obj.get('parts', 0))
         self.country = msg_obj.get('country')
         self.operator = msg_obj.get('operator')
